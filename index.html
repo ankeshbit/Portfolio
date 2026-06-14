@@ -19,9 +19,11 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
     rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/opentype.js/dist/opentype.min.js"></script>
 </head>
 
 <body>
+  <canvas id="plasma-bg"></canvas>
   <!-- ═══════════════════════════ NAVBAR ═══════════════════════════ -->
   <nav id="navbar" class="navbar">
     <a href="#landing" class="nav-logo">AS</a>
@@ -1264,6 +1266,12 @@
     <div class="container">
       <p class="footer-name">Ankesh Srivastava</p>
       <p class="footer-tagline">Building full-stack apps and data-driven systems, one project at a time.</p>
+      
+      <!-- Handwritten Signature -->
+      <div class="signature-wrapper">
+        <div class="signature-container" id="signatureContainer"></div>
+      </div>
+
       <div class="footer-socials">
         <a href="https://github.com/ankeshbit" target="_blank" rel="noopener" aria-label="GitHub">
           <svg viewBox="0 0 24 24" fill="currentColor">

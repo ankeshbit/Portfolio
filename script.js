@@ -368,18 +368,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const certSection = document.getElementById('certifications');
   
   if (animatedTrack && certSection) {
-    // Duplicate the certificates array for loop buffer
-    const duplicatedCerts = [...certificates, ...certificates];
-    
-    // Dynamic generation of cards
-    duplicatedCerts.forEach((item, index) => {
+    // Dynamic generation of cards (no duplication for clean linear surfer)
+    certificates.forEach((item, index) => {
       const card = document.createElement('a');
       card.href = item.image;
       card.target = '_blank';
       card.className = 'cert-surfer-card';
       
       // Index formatted as 01-19
-      const numString = String((index % certificates.length) + 1).padStart(2, '0');
+      const numString = String(index + 1).padStart(2, '0');
       
       card.innerHTML = `
         <div class="cert-card-num">${numString}</div>
@@ -404,7 +401,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Positions and constants
     const scrollPerItem = 600;
-    const loopDistance = certificates.length * scrollPerItem;
+    const maxScroll = (certificates.length - 1) * scrollPerItem;
+    
+    // Set section height dynamically to cover all certificates exactly
+    certSection.style.height = `${maxScroll + window.innerHeight}px`;
     
     const stepX = 240;
     const stepY = -84;
@@ -416,22 +416,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // Update track and cards based on scroll and mouse position
     function updateSurfer() {
       const startScroll = certSection.offsetTop;
-      const totalScrollable = certSection.offsetHeight - window.innerHeight;
       const relativeScroll = window.scrollY - startScroll;
       
-      // Calculate looped progress
-      // Math.max(0, relativeScroll) to prevent negative modulo at top
-      const loopedProgress = Math.max(0, relativeScroll) % loopDistance;
-      const progressRatio = loopedProgress / loopDistance;
+      // Calculate progress ratio clamped between 0 and 1
+      const progressRatio = Math.max(0, Math.min(1, relativeScroll / maxScroll));
       
-      const sceneX = -progressRatio * certificates.length * stepX;
-      const sceneY = -progressRatio * certificates.length * stepY;
-      const sceneZ = -progressRatio * certificates.length * stepZ;
+      const sceneX = -progressRatio * (certificates.length - 1) * stepX;
+      const sceneY = -progressRatio * (certificates.length - 1) * stepY;
+      const sceneZ = -progressRatio * (certificates.length - 1) * stepZ;
       
       // Transform track
       animatedTrack.style.transform = `translate3d(${sceneX}px, ${sceneY}px, ${sceneZ}px)`;
       
-      // Get all cards to calculate distance from mouse
+      const activeIndex = progressRatio * (certificates.length - 1);
+      
+      // Get all cards to calculate distance and adjust scale/opacity/active state
       const cards = animatedTrack.querySelectorAll('.cert-surfer-card');
       cards.forEach((card, i) => {
         const rect = card.getBoundingClientRect();
@@ -439,14 +438,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const centerY = rect.top + rect.height / 2;
         
         let scale = 1;
-        let uplift = 0;
         
         if (mouseX !== -10000) {
           const dist = Math.sqrt(Math.pow(mouseX - centerX, 2) + Math.pow(mouseY - centerY, 2));
           // Proximity threshold of 400px
           if (dist < 400) {
             const factor = 1 - (dist / 400); // 1 at mouse, 0 at 400px
-            scale = 1 + 0.5 * factor; // scale up to 1.5
+            scale = 1 + 0.3 * factor; // scale up to 1.3
           }
         }
         
@@ -454,7 +452,21 @@ document.addEventListener('DOMContentLoaded', () => {
         const baseY = i * stepY;
         const baseZ = i * stepZ;
         
-        card.style.transform = `translate3d(${baseX}px, ${baseY + uplift}px, ${baseZ}px) rotateY(-50deg) scale(${scale})`;
+        // Calculate distance from active index
+        const delta = i - activeIndex;
+        let opacity = 1;
+        if (delta < 0) {
+          opacity = Math.max(0, 1 + delta / 1.5); // Fades out cards that have passed
+        } else {
+          opacity = Math.max(0, 1 - delta / 5); // Fades out cards far in the distance
+        }
+        
+        const isActive = Math.abs(delta) < 0.45;
+        card.classList.toggle('active', isActive);
+        
+        card.style.opacity = opacity;
+        card.style.pointerEvents = opacity < 0.15 ? 'none' : 'auto';
+        card.style.transform = `translate3d(${baseX}px, ${baseY}px, ${baseZ}px) rotateY(-50deg) scale(${scale})`;
       });
     }
 
@@ -529,6 +541,431 @@ document.addEventListener('DOMContentLoaded', () => {
         closeLightbox();
       }
     });
+  }
+
+  /* ─────────────────────────────────────────────
+     14. HANDWRITTEN SIGNATURE — opentype.js & WAAPI
+     ───────────────────────────────────────────── */
+  let signatureFont = null;
+  const fontUrl = 'https://www.componentry.fun/LastoriaBoldRegular.otf';
+
+  opentype.load(fontUrl, function (err, font) {
+    if (err) {
+      console.error('Font could not be loaded: ' + err);
+    } else {
+      signatureFont = font;
+      initSignature();
+    }
+  });
+
+  function initSignature() {
+    if (!signatureFont) return;
+
+    const text = 'Ankesh';
+    const fontSize = 64;
+    const container = document.getElementById('signatureContainer');
+    if (!container) return;
+
+    container.innerHTML = ''; // Clear previous if any
+
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    let x = 15; // Starting padding
+    const y = fontSize * 1.1; // Baseline offset to fit font outlines nicely
+
+    const pathsContainer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      const glyph = signatureFont.charToGlyph(char);
+      const path = glyph.getPath(x, y, fontSize);
+      const pathData = path.toPathData();
+
+      const svgPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      svgPath.setAttribute('d', pathData);
+      svgPath.setAttribute('class', 'sig-path');
+      svgPath.setAttribute('stroke', '#d4af37');
+      svgPath.setAttribute('stroke-width', '1.5');
+      svgPath.setAttribute('fill', '#d4af37');
+      svgPath.setAttribute('fill-opacity', '0');
+      svgPath.style.opacity = '0'; // start hidden
+
+      pathsContainer.appendChild(svgPath);
+
+      x += glyph.advanceWidth * (fontSize / signatureFont.unitsPerEm);
+    }
+
+    const totalWidth = x + 15; // Ending padding
+    const height = fontSize * 1.5;
+
+    svg.setAttribute('viewBox', `0 0 ${totalWidth} ${height}`);
+    svg.setAttribute('width', `${totalWidth}px`);
+    svg.setAttribute('height', `${height}px`);
+    svg.appendChild(pathsContainer);
+    container.appendChild(svg);
+
+    // Trigger animation once when signature wrapper scrolls into view
+    const signatureWrapper = container.closest('.signature-wrapper');
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          playSignatureAnimation();
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1 });
+
+    if (signatureWrapper) {
+      observer.observe(signatureWrapper);
+    } else {
+      observer.observe(container);
+    }
+  }
+
+  function playSignatureAnimation() {
+    const paths = document.querySelectorAll('.sig-path');
+    paths.forEach((path, index) => {
+      const length = path.getTotalLength();
+
+      // Reset style values
+      path.style.opacity = '1';
+      path.style.strokeDasharray = length;
+      path.style.strokeDashoffset = length;
+      path.style.fillOpacity = '0';
+
+      // Cancel any active animation
+      path.getAnimations().forEach(anim => anim.cancel());
+
+      // Stroke draw animation (1.5s duration, 0.2s stagger)
+      path.animate([
+        { strokeDashoffset: length },
+        { strokeDashoffset: 0 }
+      ], {
+        duration: 1500,
+        delay: index * 200,
+        fill: 'forwards',
+        easing: 'ease-out'
+      });
+
+      // Fill flood animation (starts slightly before stroke finishes drawing)
+      path.animate([
+        { fillOpacity: 0 },
+        { fillOpacity: 1 }
+      ], {
+        duration: 600,
+        delay: (index * 200) + 1200,
+        fill: 'forwards',
+        easing: 'ease-in-out'
+      });
+    });
+  }
+
+  /* ─────────────────────────────────────────────
+     15. WEBGL PLASMA BACKGROUND
+     ───────────────────────────────────────────── */
+  const canvas = document.getElementById('plasma-bg');
+  if (canvas) {
+    initPlasma();
+  }
+
+  function initPlasma() {
+    let gl;
+    try {
+      gl = canvas.getContext('webgl', { antialias: false, alpha: false });
+    } catch (e) {
+      // Fallback
+    }
+    if (!gl) {
+      canvas.style.display = 'none';
+      return;
+    }
+
+    const VERTEX_SHADER_SRC = `
+attribute vec2 position;
+void main() {
+  gl_Position = vec4(position, 0.0, 1.0);
+}
+    `;
+
+    const FRAGMENT_SHADER_SRC = `
+precision highp float;
+
+uniform vec2 u_res;
+uniform float u_time;
+uniform vec2 u_mouse;
+uniform float u_isDark;
+uniform float u_speed;
+uniform float u_turbulence;
+uniform float u_mouseInfluence;
+uniform float u_grain;
+uniform float u_sparkle;
+uniform float u_vignette;
+uniform float u_opacity;
+
+uniform vec3 u_darkA;
+uniform vec3 u_darkB;
+uniform vec3 u_darkC;
+uniform vec3 u_lightA;
+uniform vec3 u_lightB;
+uniform vec3 u_lightC;
+
+vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+vec3 permute(vec3 x) { return mod289(((x * 34.0) + 1.0) * x); }
+
+float snoise(vec2 v) {
+  const vec4 C = vec4(0.211324865405187, 0.366025403784439,
+                     -0.577350269189626, 0.024390243902439);
+  vec2 i = floor(v + dot(v, C.yy));
+  vec2 x0 = v - i + dot(i, C.xx);
+  vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+  vec4 x12 = x0.xyxy + C.xxzz;
+  x12.xy -= i1;
+  i = mod289(i);
+  vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0)) + i.x + vec3(0.0, i1.x, 1.0));
+  vec3 m = max(0.5 - vec3(dot(x0, x0), dot(x12.xy, x12.xy), dot(x12.zw, x12.zw)), 0.0);
+  m = m * m;
+  m = m * m;
+  vec3 x = 2.0 * fract(p * C.www) - 1.0;
+  vec3 h = abs(x) - 0.5;
+  vec3 ox = floor(x + 0.5);
+  vec3 a0 = x - ox;
+  m *= 1.79284291400159 - 0.85373472095314 * (a0 * a0 + h * h);
+  vec3 g;
+  g.x = a0.x * x0.x + h.x * x0.y;
+  g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+  return 130.0 * dot(m, g);
+}
+
+float fbm(vec2 p, float turbulence) {
+  float total = 0.0;
+  float amp = 0.5;
+  float freq = 1.0;
+  mat2 rot = mat2(cos(0.45), sin(0.45), -sin(0.45), cos(0.45));
+  for (int i = 0; i < 5; i++) {
+    total += snoise(p * freq) * amp;
+    p = rot * p;
+    freq *= mix(1.85, 2.35, clamp(turbulence, 0.0, 2.0) * 0.5);
+    amp *= 0.5;
+  }
+  return total;
+}
+
+void main() {
+  vec2 uv = gl_FragCoord.xy / u_res;
+  float aspect = u_res.x / max(u_res.y, 1.0);
+  vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
+  float t = u_time * (0.15 * u_speed);
+
+  vec2 mouse = (u_mouse - 0.5) * vec2(aspect, 1.0);
+  float dMouse = length(p - mouse);
+  p += (mouse - p) * 0.02 * u_mouseInfluence * smoothstep(0.45, 0.0, dMouse);
+
+  vec2 flow = vec2(
+    fbm(p + vec2(t * 0.2, t * 0.1), u_turbulence),
+    fbm(p + vec2(-t * 0.1, t * 0.3), u_turbulence)
+  );
+
+  float n = fbm(p * 2.0 + flow * 1.45, u_turbulence);
+  float ridges = 1.0 - abs(snoise(p * 4.0 + n) * 2.0);
+  ridges = pow(ridges, 3.0);
+
+  vec3 colorA = mix(u_lightA, u_darkA, u_isDark);
+  vec3 colorB = mix(u_lightB, u_darkB, u_isDark);
+  vec3 colorC = mix(u_lightC, u_darkC, u_isDark);
+
+  vec3 col = mix(colorA, colorB, smoothstep(-0.5, 0.5, n));
+  col = mix(col, colorC, smoothstep(0.25, 1.0, n * 0.52 + ridges * 0.48));
+
+  float sparkle = pow(max(0.0, snoise(gl_FragCoord.xy * 0.2 + t * 2.0)), 18.0) * 0.5 * u_sparkle;
+  vec3 sparkleColor = mix(vec3(0.56, 0.58, 0.72), vec3(0.8, 0.9, 1.0), u_isDark);
+  col += sparkleColor * sparkle;
+
+  float vigDark = 1.0 - smoothstep(0.5, mix(1.8, 1.55, u_isDark), length(p));
+  col = mix(col, col * vigDark, u_isDark * u_vignette);
+  float vigLight = 1.0 - smoothstep(0.4, 1.45, length(p));
+  col = mix(mix(vec3(1.0), col, vigLight), col, u_isDark);
+
+  float grain = (fract(sin(dot(gl_FragCoord.xy + t * 50.0, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * (0.06 * u_grain);
+  col += grain;
+
+  gl_FragColor = vec4(clamp(col, 0.0, 1.0), u_opacity);
+}
+    `;
+
+    // Colors
+    const darkColorA = '#0a1929';
+    const darkColorB = '#102a43';
+    const darkColorC = '#d4af37';
+    const lightColorA = '#f0f2f7';
+    const lightColorB = '#d7dceb';
+    const lightColorC = '#bcc5e0';
+
+    // Uniform settings
+    const settings = {
+      speed: 0.8,
+      turbulence: 1.2,
+      mouseInfluence: 1.0,
+      grain: 0.8,
+      sparkle: 1.2,
+      vignette: 1.0,
+      opacity: 1.0,
+      isDark: 1.0
+    };
+
+    function hexToRgb01(hex) {
+      const normalized = hex.trim().replace('#', '');
+      const r = parseInt(normalized.slice(0, 2), 16) / 255;
+      const g = parseInt(normalized.slice(2, 4), 16) / 255;
+      const b = parseInt(normalized.slice(4, 6), 16) / 255;
+      return [r, g, b];
+    }
+
+    function compileShader(type, source) {
+      const shader = gl.createShader(type);
+      if (!shader) return null;
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        console.error(gl.getShaderInfoLog(shader));
+        gl.deleteShader(shader);
+        return null;
+      }
+      return shader;
+    }
+
+    const vertexShader = compileShader(gl.VERTEX_SHADER, VERTEX_SHADER_SRC);
+    const fragmentShader = compileShader(gl.FRAGMENT_SHADER, FRAGMENT_SHADER_SRC);
+
+    if (!vertexShader || !fragmentShader) {
+      canvas.style.display = 'none';
+      return;
+    }
+
+    const program = gl.createProgram();
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+    gl.linkProgram(program);
+
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      console.error(gl.getProgramInfoLog(program));
+      gl.deleteShader(vertexShader);
+      gl.deleteShader(fragmentShader);
+      gl.deleteProgram(program);
+      canvas.style.display = 'none';
+      return;
+    }
+
+    gl.useProgram(program);
+
+    // Buffers and attributes
+    const positionAttributeLocation = gl.getAttribLocation(program, 'position');
+    const positionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    gl.bufferData(
+      gl.ARRAY_BUFFER,
+      new Float32Array([
+        -1.0, -1.0,
+         1.0, -1.0,
+        -1.0,  1.0,
+         1.0,  1.0,
+      ]),
+      gl.STATIC_DRAW
+    );
+    gl.enableVertexAttribArray(positionAttributeLocation);
+    gl.vertexAttribPointer(positionAttributeLocation, 2, gl.FLOAT, false, 0, 0);
+
+    // Uniform locations
+    const uRes = gl.getUniformLocation(program, 'u_res');
+    const uTime = gl.getUniformLocation(program, 'u_time');
+    const uMouse = gl.getUniformLocation(program, 'u_mouse');
+    const uIsDark = gl.getUniformLocation(program, 'u_isDark');
+    const uSpeed = gl.getUniformLocation(program, 'u_speed');
+    const uTurbulence = gl.getUniformLocation(program, 'u_turbulence');
+    const uMouseInfluence = gl.getUniformLocation(program, 'u_mouseInfluence');
+    const uGrain = gl.getUniformLocation(program, 'u_grain');
+    const uSparkle = gl.getUniformLocation(program, 'u_sparkle');
+    const uVignette = gl.getUniformLocation(program, 'u_vignette');
+    const uOpacity = gl.getUniformLocation(program, 'u_opacity');
+    
+    const uDarkA = gl.getUniformLocation(program, 'u_darkA');
+    const uDarkB = gl.getUniformLocation(program, 'u_darkB');
+    const uDarkC = gl.getUniformLocation(program, 'u_darkC');
+    const uLightA = gl.getUniformLocation(program, 'u_lightA');
+    const uLightB = gl.getUniformLocation(program, 'u_lightB');
+    const uLightC = gl.getUniformLocation(program, 'u_lightC');
+
+    // Convert colors to vec3 floats
+    const cDarkA = hexToRgb01(darkColorA);
+    const cDarkB = hexToRgb01(darkColorB);
+    const cDarkC = hexToRgb01(darkColorC);
+    const cLightA = hexToRgb01(lightColorA);
+    const cLightB = hexToRgb01(lightColorB);
+    const cLightC = hexToRgb01(lightColorC);
+
+    gl.uniform3f(uDarkA, cDarkA[0], cDarkA[1], cDarkA[2]);
+    gl.uniform3f(uDarkB, cDarkB[0], cDarkB[1], cDarkB[2]);
+    gl.uniform3f(uDarkC, cDarkC[0], cDarkC[1], cDarkC[2]);
+    gl.uniform3f(uLightA, cLightA[0], cLightA[1], cLightA[2]);
+    gl.uniform3f(uLightB, cLightB[0], cLightB[1], cLightB[2]);
+    gl.uniform3f(uLightC, cLightC[0], cLightC[1], cLightC[2]);
+
+    // Mouse positions
+    let mouse = { x: 0.5, y: 0.5 };
+    let targetMouse = { x: 0.5, y: 0.5 };
+
+    // Event listeners
+    window.addEventListener('mousemove', (e) => {
+      targetMouse.x = e.clientX / window.innerWidth;
+      targetMouse.y = 1.0 - (e.clientY / window.innerHeight);
+    });
+
+    window.addEventListener('mouseleave', () => {
+      targetMouse.x = 0.5;
+      targetMouse.y = 0.5;
+    });
+
+    // Resize handler
+    function resizeCanvas() {
+      const dpr = Math.min(window.devicePixelRatio || 1.0, 1.75);
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      canvas.width = Math.max(1, Math.floor(width * dpr));
+      canvas.height = Math.max(1, Math.floor(height * dpr));
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.uniform2f(uRes, canvas.width, canvas.height);
+    }
+
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    // Animation loop
+    const start = performance.now();
+    let rafId;
+
+    function render(now) {
+      const elapsed = (now - start) / 1000;
+
+      // Lerp mouse
+      mouse.x += (targetMouse.x - mouse.x) * 0.05;
+      mouse.y += (targetMouse.y - mouse.y) * 0.05;
+
+      gl.uniform1f(uTime, elapsed);
+      gl.uniform2f(uMouse, mouse.x, mouse.y);
+      gl.uniform1f(uIsDark, settings.isDark);
+      gl.uniform1f(uSpeed, settings.speed);
+      gl.uniform1f(uTurbulence, settings.turbulence);
+      gl.uniform1f(uMouseInfluence, settings.mouseInfluence);
+      gl.uniform1f(uGrain, settings.grain);
+      gl.uniform1f(uSparkle, settings.sparkle);
+      gl.uniform1f(uVignette, settings.vignette);
+      gl.uniform1f(uOpacity, settings.opacity);
+
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+      rafId = requestAnimationFrame(render);
+    }
+
+    rafId = requestAnimationFrame(render);
   }
 
 });
