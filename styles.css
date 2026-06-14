@@ -772,6 +772,13 @@ ul {
    PAGE 3: WORK EXPERIENCE
    ═══════════════════════════════════════════════════════════════ */
 .section-experience {
+  background: var(--bg-secondary);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PAGE 3.5: VOLUNTEER EXPERIENCE
+   ═══════════════════════════════════════════════════════════════ */
+.section-volunteer {
   background: var(--bg-primary);
 }
 
@@ -976,7 +983,7 @@ ul {
    PAGE 4: EDUCATION
    ═══════════════════════════════════════════════════════════════ */
 .section-education {
-  background: var(--bg-secondary);
+  background: var(--bg-primary);
 }
 
 .edu-cards {
@@ -1190,7 +1197,7 @@ ul {
    PAGE 5: PROJECTS
    ═══════════════════════════════════════════════════════════════ */
 .section-projects {
-  background: var(--bg-primary);
+  background: var(--bg-secondary);
 }
 
 .projects-grid {
@@ -1419,7 +1426,7 @@ ul {
    PAGE 6: SKILLS
    ═══════════════════════════════════════════════════════════════ */
 .section-skills {
-  background: var(--bg-secondary);
+  background: var(--bg-primary);
 }
 
 .skills-grid {
